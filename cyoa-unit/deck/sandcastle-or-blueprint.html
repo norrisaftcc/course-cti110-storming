@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+<title>Sand Castle or Blueprint</title>
+<style>
+/* ==== SAND CASTLE OR BLUEPRINT · CTI 110 final-project launch deck ====
+   One file. No external scripts, fonts or images: it works offline.
+   Keys: Right arrow or Space = next, Left arrow = back, N = speaker notes, T = light/dark.
+   Deck engine and the two registers are adapted from a measured case study
+   (see cyoa-unit/SOURCES.md, the slides.html row).
+
+   Three registers, one engine:
+     night  the neutral frame (cover, fairness, the point, the numbers, your turn)
+     sc     SAND CASTLE: loud, tilted, a little unstable
+     bp     BLUEPRINT:   flat, gridded, exact, no tilt, no glow, no motion
+
+   Colours are tokens. Light is the default. Dark comes from the system setting,
+   or from the T key / theme button (data-theme on <html>).
+   Light contrast on paper #FBF8F2 (WCAG 2.x): ink 16.6, soft 11.4, muted 6.9,
+   pink 6.9, orange 5.5, cyan 5.6. On blueprint #F3F7FB: bink 14.6, bsoft 10.3,
+   bmuted 5.9, bcyan 6.4, bamber 6.0. Dark values are the night palette (all 6+).
+*/
+:root{
+  --paper:#FBF8F2; --paper2:#FFFFFF; --paper3:#F1EBDF; --line:#B9AE9C;
+  --ink:#1D1A17; --soft:#3B352F; --muted:#5F574F;
+  --pink:#B0124F; --orange:#A84B00; --sun:#FFD84D; --cyan:#00707C;
+  --green:#1E7A45; --violet:#5B3FB5; --red:#B3261E;
+  --sc-base:#FFF6EA; --sc-glow1:#FFE2C2; --sc-glow2:#FBD7E7;
+  --night-glow1:#F3ECDF; --night-glow2:#EFE7F5;
+  --navy:#F3F7FB; --navy2:#FFFFFF; --grid:#E3ECF5; --grid2:#C9DAEC; --bline:#2F6FA8;
+  --bink:#0B2540; --bsoft:#203E5C; --bmuted:#48647F;
+  --bcyan:#0B5CAD; --bamber:#8A5300; --bgreen:#1E7A45; --bred:#A8231B;
+  --speed:rgba(176,18,79,.07); --scan:transparent;
+  --glitch-a:rgba(176,18,79,.35); --glitch-b:rgba(0,112,124,.35);
+  --hud-bg:rgba(255,255,255,.92); --bar-ink:#1D1A17;
+  --font-condensed:"Arial Narrow","Roboto Condensed","Helvetica Neue",Arial,system-ui,sans-serif;
+  --font-body:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --font-mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
+  /* role tokens: a register re-points these; components never name a register colour */
+  --t-ink:var(--ink); --t-soft:var(--soft); --t-muted:var(--muted);
+  --t-accent:var(--pink); --t-accent2:var(--cyan); --t-panel:var(--paper2); --t-line:var(--line);
+  --t-good:var(--green); --t-bad:var(--red); --t-rule:rgba(95,87,79,.25);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#0B0618; --paper2:#160D2E; --paper3:#21143F; --line:#7A68BF;
+    --ink:#F5F0FF; --soft:#D5CCEE; --muted:#B4AAD6;
+    --pink:#FF5CAA; --orange:#FF9F45; --sun:#FFE14A; --cyan:#33F3FF;
+    --green:#7CFFB9; --violet:#B79DFF; --red:#FF7480;
+    --sc-base:#0B0618; --sc-glow1:#4A0F3F; --sc-glow2:#2B0F4A;
+    --night-glow1:#2B0F4A; --night-glow2:#3A0F3A;
+    --navy:#06121F; --navy2:#0A1D31; --grid:#0C2338; --grid2:#123350; --bline:#2F7FA8;
+    --bink:#EAF7FF; --bsoft:#C4E0F2; --bmuted:#98BDD6;
+    --bcyan:#4FE3FF; --bamber:#FFC24D; --bgreen:#7CFFB9; --bred:#FF8C96;
+    --speed:rgba(255,92,170,.16); --scan:rgba(0,0,0,.10);
+    --glitch-a:#FF5CAA; --glitch-b:#33F3FF;
+    --hud-bg:rgba(11,6,24,.86); --t-rule:rgba(180,170,214,.25);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0B0618; --paper2:#160D2E; --paper3:#21143F; --line:#7A68BF;
+  --ink:#F5F0FF; --soft:#D5CCEE; --muted:#B4AAD6;
+  --pink:#FF5CAA; --orange:#FF9F45; --sun:#FFE14A; --cyan:#33F3FF;
+  --green:#7CFFB9; --violet:#B79DFF; --red:#FF7480;
+  --sc-base:#0B0618; --sc-glow1:#4A0F3F; --sc-glow2:#2B0F4A;
+  --night-glow1:#2B0F4A; --night-glow2:#3A0F3A;
+  --navy:#06121F; --navy2:#0A1D31; --grid:#0C2338; --grid2:#123350; --bline:#2F7FA8;
+  --bink:#EAF7FF; --bsoft:#C4E0F2; --bmuted:#98BDD6;
+  --bcyan:#4FE3FF; --bamber:#FFC24D; --bgreen:#7CFFB9; --bred:#FF8C96;
+  --speed:rgba(255,92,170,.16); --scan:rgba(0,0,0,.10);
+  --glitch-a:#FF5CAA; --glitch-b:#33F3FF;
+  --hud-bg:rgba(11,6,24,.86); --t-rule:rgba(180,170,214,.25);
+}
+.slide[data-reg="sc"]{--t-accent:var(--pink);--t-accent2:var(--orange);--t-line:var(--pink)}
+.slide[data-reg="bp"]{--t-ink:var(--bink);--t-soft:var(--bsoft);--t-muted:var(--bmuted);
+  --t-accent:var(--bcyan);--t-accent2:var(--bamber);--t-panel:var(--navy2);--t-line:var(--bline);
+  --t-good:var(--bgreen);--t-bad:var(--bred);--t-rule:var(--grid2)}
+
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{font-family:var(--font-body);color:var(--ink);overflow:hidden;background-color:var(--paper);
+  background-image:radial-gradient(ellipse at 12% 0%,var(--night-glow1) 0,transparent 55%),
+                   radial-gradient(ellipse at 100% 100%,var(--night-glow2) 0,transparent 50%)}
+body[data-reg="sc"]{background-color:var(--sc-base);
+  background-image:radial-gradient(ellipse at 90% 0%,var(--sc-glow1) 0,transparent 55%),
+                   radial-gradient(ellipse at 0% 100%,var(--sc-glow2) 0,transparent 55%)}
+/* the blueprint sheet: flat, with a 24px grid and a 120px major grid */
+body[data-reg="bp"]{background-color:var(--navy);
+  background-image:linear-gradient(var(--grid2) 1px,transparent 1px),linear-gradient(90deg,var(--grid2) 1px,transparent 1px),
+                   linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:120px 120px,120px 120px,24px 24px,24px 24px}
+
+/* decoration: CSS only, hidden from screen readers, off under reduced motion */
+.fx{position:fixed;left:0;right:0;top:36px;bottom:0;pointer-events:none;opacity:0;transition:opacity .3s}
+.fx-speed{z-index:0;background:repeating-conic-gradient(from 0deg at 100% 0%,var(--speed) 0 .7deg,transparent .7deg 4.2deg);
+  -webkit-mask-image:radial-gradient(circle at 100% 0%,#000 0,#000 18%,transparent 66%);
+          mask-image:radial-gradient(circle at 100% 0%,#000 0,#000 18%,transparent 66%)}
+.fx-scan{z-index:120;background:repeating-linear-gradient(to bottom,var(--scan) 0 1px,transparent 1px 3px)}
+body[data-reg="sc"] .fx{opacity:1}
+@media (prefers-reduced-motion:reduce){.fx{display:none}}
+
+.topbar{position:fixed;top:0;left:0;right:0;height:36px;background:var(--sun);color:var(--bar-ink);z-index:200;
+  display:flex;align-items:center;justify-content:center;gap:10px;font-family:var(--font-mono);font-size:11px;
+  letter-spacing:.14em;text-transform:uppercase;font-weight:600;border-bottom:2px solid var(--bar-ink);padding:0 16px;
+  white-space:nowrap;overflow:hidden}
+
+.deck{height:100%;position:relative;padding-top:36px;z-index:1}
+.slide{position:absolute;top:36px;left:0;right:0;bottom:0;display:none;flex-direction:column;
+  padding:4.2vh 6vw 72px;color:var(--t-ink);overflow-y:auto;overflow-x:hidden;min-width:0}
+.slide.active{display:flex}
+.slide>*{min-width:0}
+
+.voice-eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--t-muted);
+  margin-bottom:14px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;overflow-wrap:anywhere}
+.reg{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.16em;padding:2px 8px;color:var(--t-accent);border:1px solid var(--t-accent)}
+.slide[data-reg="sc"] .reg{transform:rotate(-2deg);border-width:2px;font-weight:700}
+.slide-num{position:absolute;bottom:22px;right:16px;font-family:var(--font-mono);font-size:11px;color:var(--t-muted)}
+.hud{position:fixed;bottom:18px;left:16px;font-family:var(--font-mono);font-size:11px;color:var(--ink);z-index:150;user-select:none;
+  background:var(--hud-bg);border:1px solid var(--line);padding:5px 10px;border-radius:3px;display:flex;gap:8px;align-items:center}
+.hud button{font:inherit;color:var(--bar-ink);background:var(--sun);border:0;padding:3px 8px;cursor:pointer;border-radius:2px;font-weight:700}
+:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+
+h1{font-family:var(--font-condensed);font-stretch:condensed;font-weight:700;text-transform:uppercase;line-height:1.05;letter-spacing:.01em;color:var(--t-ink)}
+.big{font-size:clamp(40px,6.2vw,84px)}
+.med{font-size:clamp(26px,3.9vw,48px)}
+.slide[data-reg="sc"] h1{text-shadow:2px 0 var(--glitch-a),-2px 0 var(--glitch-b)}
+@media (prefers-reduced-motion:no-preference){
+  .slide[data-reg="sc"].active h1{animation:glitch 4s infinite}
+  .stamp{animation:stampjit 3.2s steps(1) infinite}
+}
+@keyframes glitch{0%,92%,100%{transform:none}94%{transform:translate(-3px,1px) skewX(4deg)}96%{transform:translate(3px,-1px)}}
+@keyframes stampjit{0%,90%,100%{transform:rotate(-3deg)}93%{transform:rotate(-1.5deg) translate(2px,0)}96%{transform:rotate(-4deg)}}
+/* blueprint titles: flat, tracked, with a dimension line under them */
+.slide[data-reg="bp"] h1{font-weight:600;letter-spacing:.05em;border-bottom:1px solid var(--bline);padding-bottom:8px;position:relative}
+.slide[data-reg="bp"] h1::before,.slide[data-reg="bp"] h1::after{content:"";position:absolute;bottom:-4px;width:1px;height:7px;background:var(--bline)}
+.slide[data-reg="bp"] h1::before{left:0}
+.slide[data-reg="bp"] h1::after{right:0}
+
+p.deck-body{font-size:clamp(14.5px,1.5vw,19px);color:var(--t-soft);max-width:44em;margin-top:12px;line-height:1.55}
+p.deck-body b,.checklist li b,.card p b{color:var(--t-ink);font-weight:650}
+code,.mono{font-family:var(--font-mono);font-size:.9em}
+
+.stamp{display:inline-block;border:3px solid var(--orange);color:var(--orange);font-family:var(--font-condensed);font-stretch:condensed;
+  font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:8px 16px;transform:rotate(-3deg);
+  font-size:clamp(14px,1.6vw,19px);margin:14px 0;align-self:flex-start;max-width:100%}
+.seal{display:inline-block;border:1px solid var(--bcyan);color:var(--bcyan);font-family:var(--font-mono);font-weight:600;
+  text-transform:uppercase;letter-spacing:.12em;padding:7px 14px;font-size:clamp(11px,1.2vw,13px);margin:12px 0;align-self:flex-start;max-width:100%}
+.bigline{font-family:var(--font-condensed);font-stretch:condensed;font-weight:700;text-transform:uppercase;
+  font-size:clamp(20px,2.6vw,32px);color:var(--t-accent2);line-height:1.15;margin-top:14px;max-width:30em}
+
+.ooc-note{background:var(--t-panel);border:1px solid var(--t-line);border-left:4px solid var(--t-muted);padding:12px 16px;margin-top:14px;max-width:48em}
+.ooc-note b.h{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--t-muted);display:block;margin-bottom:5px}
+.ooc-note p{font-size:clamp(13px,1.3vw,15px);color:var(--t-soft);line-height:1.5}
+.slide[data-reg="bp"] .ooc-note{border-left-color:var(--bamber)}
+.slide[data-reg="bp"] .ooc-note b.h{color:var(--bamber)}
+
+.checklist{margin-top:12px;max-width:50em}
+.checklist li{font-size:clamp(14px,1.5vw,18px);color:var(--t-soft);padding:7px 0 7px 24px;position:relative;
+  border-bottom:1px solid var(--t-rule);list-style:none;line-height:1.45}
+.checklist li::before{content:"\25B8";position:absolute;left:2px;color:var(--t-accent);font-weight:700}
+.slide[data-reg="bp"] .checklist li::before{content:"\25AB"}
+
+.lane-label{font-family:var(--font-mono);font-size:clamp(10.5px,1.2vw,12.5px);letter-spacing:.14em;text-transform:uppercase;
+  color:var(--t-accent2);font-weight:700;margin-bottom:4px}
+.finding{display:block;font-family:var(--font-mono);font-size:clamp(10.5px,1.05vw,11.5px);color:var(--t-muted);
+  margin-top:6px;letter-spacing:.02em;line-height:1.5;overflow-wrap:anywhere}
+
+.states{margin-top:10px;max-width:56em;border-collapse:collapse;width:100%}
+.states td{border-bottom:1px solid var(--t-rule);padding:7px 10px 7px 0;vertical-align:top;font-size:clamp(13px,1.35vw,16px);color:var(--t-soft);line-height:1.4}
+.states td.m{font-family:var(--font-mono);font-weight:700;color:var(--t-ink);white-space:nowrap}
+
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:18px 26px;margin-top:14px;align-items:start}
+.cols.wide-l{grid-template-columns:1.25fr 1fr}
+.waves{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-top:16px;align-items:stretch}
+.card{background:var(--t-panel);border:1px solid var(--t-line);padding:12px 14px;position:relative}
+.card h2{font-family:var(--font-condensed);font-stretch:condensed;font-weight:700;text-transform:uppercase;font-size:clamp(18px,2vw,24px);
+  letter-spacing:.03em;color:var(--t-ink);margin-bottom:5px}
+.card p,.card li{font-size:clamp(13px,1.3vw,15.5px);color:var(--t-soft);line-height:1.45}
+.card ul{list-style:none}
+.card li{padding:3px 0}
+.card .tag{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--t-accent);display:block;margin-bottom:6px;font-weight:700}
+.slide[data-reg="sc"] .card{border:3px solid var(--pink);box-shadow:6px 6px 0 var(--violet);transform:rotate(-.7deg)}
+.slide[data-reg="sc"] .card:nth-child(even){transform:rotate(.8deg);border-color:var(--cyan);box-shadow:6px 6px 0 var(--pink)}
+.slide[data-reg="bp"] .card{border-color:var(--bline)}
+.slide[data-reg="bp"] .card::before,.slide[data-reg="bp"] .card::after{content:"";position:absolute;width:9px;height:9px;border:2px solid var(--bcyan)}
+.slide[data-reg="bp"] .card::before{left:-2px;top:-2px;border-right:0;border-bottom:0}
+.slide[data-reg="bp"] .card::after{right:-2px;bottom:-2px;border-left:0;border-top:0}
+
+.wave .w{font-family:var(--font-condensed);font-stretch:condensed;font-weight:700;font-size:clamp(20px,2.3vw,28px);color:var(--orange);text-transform:uppercase;line-height:1}
+.wave q{display:block;quotes:none;font-size:clamp(12.5px,1.2vw,14px);color:var(--soft);margin:7px 0;line-height:1.4}
+.wave .m{font-family:var(--font-mono);font-size:clamp(10.5px,1vw,12px);color:var(--muted);line-height:1.55;display:block}
+
+/* console panels look like a terminal in both themes */
+pre.console{background:#0E0F14;color:#7CFFB9;border:1px solid var(--bline);font-family:var(--font-mono);
+  font-size:clamp(11px,1.02vw,12.5px);line-height:1.42;padding:10px 14px;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;margin-top:10px}
+pre.console .dim{color:#C4E0F2}
+pre.console .hl{color:#FFC24D;font-weight:700}
+pre.console .cmt{color:#98BDD6}
+pre.console .hd{color:#4FE3FF;font-weight:700}
+pre.console .bad{color:#FF8C96;font-weight:700}
+.mockgrid{display:grid;gap:12px}
+.slide[data-reg="sc"] .mockgrid pre.console{border:2px solid var(--pink)}
+.mockgrid>div:nth-child(1){transform:rotate(-.8deg)}
+.mockgrid>div:nth-child(2){transform:rotate(.9deg)}
+.mockgrid>div:nth-child(3){transform:rotate(-.5deg)}
+.mock-cap{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--t-accent);font-weight:700}
+
+.lane{display:flex;flex-wrap:wrap;gap:8px 4px;align-items:stretch;margin-top:10px}
+.step{flex:1 1 130px;font-size:clamp(12.5px,1.25vw,14.5px);line-height:1.35;padding:9px 10px;color:var(--ink);min-width:0;background:var(--paper2)}
+.step small{display:block;font-family:var(--font-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:3px;font-weight:700}
+.lane.good .step{border:1px solid var(--bcyan)}
+.lane.good .step small{color:var(--bcyan)}
+.lane.bad .step{border:3px solid var(--pink);transform:rotate(-1deg)}
+.lane.bad .step:nth-child(even){transform:rotate(1.2deg)}
+.lane.bad .step small{color:var(--pink)}
+.lane .arr{align-self:center;color:var(--orange);font-family:var(--font-mono);font-weight:700;flex:0 0 auto}
+.lane-title{font-family:var(--font-mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;margin-top:16px;font-weight:700}
+.lane-title.g{color:var(--bcyan)} .lane-title.b{color:var(--pink)}
+.quote{border-left:4px solid var(--orange);padding:8px 14px;margin-top:14px;max-width:46em;font-size:clamp(15px,1.6vw,20px);color:var(--ink);line-height:1.45;background:var(--paper2)}
+
+.layer{background:var(--navy2);border:1px solid var(--bline);border-left:5px solid var(--bcyan);padding:10px 14px;position:relative}
+.layer + .layer{margin-top:26px}
+.layer + .layer::before{content:"calls \2193";position:absolute;top:-21px;left:14px;font-family:var(--font-mono);font-size:11px;color:var(--bamber)}
+.layer.data::before{content:"reads \2193"!important}
+.layer.eng::before{content:"game.py passes picks and results between these \2195"!important}
+.layer h3{font-family:var(--font-condensed);font-stretch:condensed;font-size:clamp(17px,1.8vw,22px);text-transform:uppercase;letter-spacing:.05em;color:var(--bink);font-weight:700}
+.layer h3 span{font-family:var(--font-mono);font-size:.55em;letter-spacing:.02em;color:var(--bcyan);margin-left:8px;text-transform:none;font-weight:600}
+.layer p{font-size:clamp(12.5px,1.2vw,14.5px);color:var(--bsoft);line-height:1.45;margin-top:3px}
+.layer p b{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--bamber);font-weight:700;margin-right:6px}
+.api{background:var(--navy2);border:1px solid var(--bline);padding:10px 14px;font-family:var(--font-mono);font-size:clamp(11px,1.1vw,13px);line-height:1.7;color:var(--bsoft);overflow-wrap:anywhere}
+.api .hd{display:block;color:var(--bamber);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;margin-bottom:4px}
+.api .own{color:var(--bgreen);font-weight:600}
+
+.vs{margin-top:10px;max-width:70em}
+.vs-head,.vs-row{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:6px 18px;align-items:baseline}
+.vs-head{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;padding-bottom:5px;border-bottom:1px solid var(--soft)}
+.vs-head .a{color:var(--pink)} .vs-head .b{color:var(--bcyan)}
+.vs-row{padding:8px 0;border-bottom:1px solid var(--t-rule);font-size:clamp(13.5px,1.45vw,17px);line-height:1.4}
+.vs-row .m{color:var(--ink);font-weight:600}
+.vs-row .a,.vs-row .b{color:var(--soft)}
+.vs-row .a b{color:var(--pink);font-size:1.25em} .vs-row .b b{color:var(--bcyan);font-size:1.25em}
+
+.three{counter-reset:three;margin-top:12px;max-width:46em}
+.three li{list-style:none;counter-increment:three;position:relative;padding:10px 0 10px 46px;border-bottom:1px solid var(--t-rule);font-size:clamp(15px,1.7vw,20px);color:var(--t-soft);line-height:1.4}
+.three li::before{content:counter(three);position:absolute;left:0;top:8px;width:32px;height:32px;border:2px solid var(--orange);color:var(--orange);
+  font-family:var(--font-condensed);font-weight:700;font-size:20px;display:flex;align-items:center;justify-content:center}
+.three li b{color:var(--t-ink)}
+
+/* cover */
+.s1{justify-content:center;overflow:hidden}
+.s1 .hero{position:absolute;right:3vw;bottom:80px;width:min(44vw,540px);opacity:.95}
+.s1 .copy{position:relative;z-index:2;max-width:60%}
+.s1 .subtitle{font-family:var(--font-condensed);font-stretch:condensed;font-weight:700;text-transform:uppercase;font-size:clamp(20px,3.4vw,40px);letter-spacing:.04em;color:var(--orange);margin-top:8px}
+.s1 .eyebrow2{font-family:var(--font-mono);font-size:clamp(11px,1.1vw,12.5px);letter-spacing:.04em;color:var(--muted);margin-top:8px;max-width:44em;line-height:1.6}
+.hero .sand{fill:url(#sandfill);stroke:var(--orange);stroke-width:3;stroke-linejoin:round}
+.hero .sand-door{fill:var(--paper)}
+.hero .bp-sheet{fill:var(--navy)}
+.hero .bp-grid{fill:url(#bpgrid)}
+.hero .bp-grid-line{stroke:var(--grid2)}
+.hero .bp-line{fill:none;stroke:var(--bcyan);stroke-width:1.5}
+.hero .bp-dim{fill:none;stroke:var(--bamber);stroke-width:1}
+.hero .bp-text{fill:var(--bamber);font-family:var(--font-mono);font-size:10px}
+.hero .wave{fill:none;stroke:var(--cyan);stroke-width:3}
+.hero .split{stroke:var(--ink);stroke-width:1;stroke-dasharray:4 4}
+
+@media (max-width:900px){
+  .waves{grid-template-columns:1fr 1fr}
+  .s1 .copy{max-width:100%}
+  .s1 .hero{opacity:.25;width:70vw;right:2vw}
+}
+@media (max-width:760px){
+  .cols,.cols.wide-l{grid-template-columns:1fr}
+}
+@media (max-width:640px){
+  .slide{padding:16px 16px 80px}
+  .voice-eyebrow{font-size:9.5px;letter-spacing:.1em;margin-bottom:10px}
+  .waves{grid-template-columns:1fr}
+  .vs-head{display:none}
+  .vs-row{grid-template-columns:1fr;gap:2px}
+  .vs-row .a::before{content:"Sand castle: ";font-family:var(--font-mono);font-size:10.5px;color:var(--pink);text-transform:uppercase;letter-spacing:.08em}
+  .vs-row .b::before{content:"Blueprint: ";font-family:var(--font-mono);font-size:10.5px;color:var(--bcyan);text-transform:uppercase;letter-spacing:.08em}
+  .states td.m{white-space:normal}
+  .hud .keys-hint{display:none}
+  .topbar{font-size:9.5px;letter-spacing:.08em}
+  .stamp{transform:rotate(-2deg)}
+  .s1 .hero{bottom:64px}
+}
+
+/* the HUD moves to the top while notes are open, so it never covers a note */
+body.show-notes .hud{bottom:auto;top:44px;left:auto;right:16px}
+aside.notes{display:none}
+body.show-notes .slide.active aside.notes{display:block;position:fixed;left:0;right:0;bottom:0;max-height:40vh;overflow-y:auto;
+  background:var(--paper2);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5;padding:14px 16px 44px;z-index:160;border-top:3px solid var(--orange)}
+aside.notes b.h{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--orange);display:block;margin-bottom:6px}
+aside.notes p{margin:0 0 8px;max-width:62em}
+</style>
+</head>
+<body data-reg="night">
+
+<div class="fx fx-speed" aria-hidden="true"></div>
+<div class="fx fx-scan" aria-hidden="true"></div>
+
+<div class="topbar">CTI 110 &middot; Final project launch &middot; Thu 11/19/26</div>
+
+<div class="deck" id="deck">
+
+  <!-- 1 · COVER -->
+  <section class="slide s1 active" data-reg="night" aria-label="Slide 1: Sand Castle or Blueprint">
+    <div class="voice-eyebrow">CTI 110 &middot; M8 Programming Miniproject &middot; About 15 minutes</div>
+    <svg class="hero" viewBox="0 0 380 290" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="sandfill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--sun)"/><stop offset="1" style="stop-color:var(--orange)"/></linearGradient>
+        <pattern id="bpgrid" width="12" height="12" patternUnits="userSpaceOnUse"><path class="bp-grid-line" d="M12 0H0V12" fill="none" stroke-width="1"/></pattern>
+        <clipPath id="clipL"><rect x="0" y="0" width="188" height="290"/></clipPath>
+        <clipPath id="clipR"><rect x="188" y="0" width="192" height="290"/></clipPath>
+        <filter id="slump" x="-10%" y="-10%" width="120%" height="120%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="4" result="noise"/>
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="10"/>
+        </filter>
+      </defs>
+      <!-- right half: the blueprint. Exact lines and dimensions. -->
+      <g clip-path="url(#clipR)">
+        <rect class="bp-sheet" x="188" y="30" width="192" height="240"/>
+        <rect class="bp-grid" x="188" y="30" width="192" height="240"/>
+        <path class="bp-line" d="M20 250 L20 120 L32 120 L32 106 L44 106 L44 120 L56 120 L56 106 L68 106 L68 120 L80 120 L80 170 L110 170 L110 80 L122 80 L122 66 L134 66 L134 80 L146 80 L146 66 L158 66 L158 80 L170 80 L170 66 L182 66 L182 80 L194 80 L194 66 L206 66 L206 80 L218 80 L218 66 L230 66 L230 80 L242 80 L242 66 L254 66 L254 80 L266 80 L266 170 L296 170 L296 120 L308 120 L308 106 L320 106 L320 120 L332 120 L332 106 L344 106 L344 120 L356 120 L356 250 Z"/>
+        <path class="bp-line" d="M168 250 V212 A20 20 0 0 1 208 212 V250"/>
+        <path class="bp-dim" d="M110 48 H266 M110 42 V54 M266 42 V54 M368 66 V250 M362 66 H374 M362 250 H374"/>
+        <text class="bp-text" x="226" y="44" text-anchor="middle">156</text>
+        <text class="bp-text" x="364" y="162" text-anchor="end">184</text>
+      </g>
+      <!-- left half: the sand castle. The same outline, slumped by the tide. -->
+      <g clip-path="url(#clipL)">
+        <g filter="url(#slump)">
+          <path class="sand" d="M20 250 L20 120 L32 120 L32 106 L44 106 L44 120 L56 120 L56 106 L68 106 L68 120 L80 120 L80 170 L110 170 L110 80 L122 80 L122 66 L134 66 L134 80 L146 80 L146 66 L158 66 L158 80 L170 80 L170 66 L182 66 L182 80 L194 80 L194 250 Z"/>
+          <path class="sand-door" d="M168 252 V214 Q182 198 194 214 V252"/>
+        </g>
+        <path class="wave" d="M0 262 q18 -10 36 0 t36 0 t36 0 t36 0 t36 0 t36 0"/>
+      </g>
+      <path class="split" d="M188 20 V280"/>
+    </svg>
+    <div class="copy">
+      <h1 class="big">Sand Castle<br>or Blueprint</h1>
+      <div class="subtitle">Your own adventure, blueprint first</div>
+      <p class="deck-body">You will build a choose-your-own-adventure game, with an AI as your collaborator. Today is about what comes <b>before</b> the first prompt.</p>
+      <div class="stamp">Blueprint gate: Tue 11/24/26</div>
+      <div class="eyebrow2">Grey lines under a claim name the file it comes from. Paths start in cyoa-unit/ or cyoa_kit/.<br>Right arrow or Space: next &middot; Left arrow: back &middot; N: notes &middot; T: light or dark</div>
+    </div>
+    <aside class="notes"><b class="h">Speaker notes &middot; Cover &middot; ~0.5 min &middot; running 0.5</b><p>Say the question first: you can make a game two ways with an AI. Send a prompt and keep stacking prompts on top. Or write a short design first, then build.</p><p>Say what this deck does not claim. It does not say quick builds are bad. It shows what happens when a quick build is shipped as the product.</p><p>Point at the picture. The same castle, twice. The left half is sand after the tide. The right half is the drawing.</p></aside>
+    <div class="slide-num"></div>
+  </section>
+
+  <!-- 2 · EXHIBIT 0 -->
+  <section class="slide" data-reg="sc" aria-label="Slide 2: Exhibit 0, the transcript">
+    <div class="voice-eyebrow"><span>Exhibit 0</span><span class="reg">SAND CASTLE</span></div>
+    <div class="lane-label">A prompt chain, written the way most of us start</div>
+    <h1 class="med">Exhibit 0: the transcript</h1>
+    <div class="cols">
+      <div>
+        <div class="card" style="margin-top:6px">
+          <span class="tag">The first prompt</span>
+          <p>"Make me a fantasy text adventure in Python. The player picks a class: warrior, mage or rogue. There should be a dungeon with lots of rooms, monsters, treasure and a dragon at the end. Make it fun and replayable."</p>
+        </div>
+        <div class="card" style="margin-top:14px">
+          <span class="tag">Then</span>
+          <ul>
+            <li>Add a save system. Add an inventory and gold.</li>
+            <li>Make it spookier. Add a Sanity meter.</li>
+            <li>Add more endings. Make the choices really matter.</li>
+            <li>"It's due tomorrow. Clean it up and ship it."</li>
+          </ul>
+        </div>
+        <span class="finding">final-project/EXHIBIT-0.md &middot; written for this class</span>
+      </div>
+      <div>
+        <p class="deck-body" style="margin-top:6px">It has <b>wishes</b>. It does not have what a build needs.</p>
+        <ul class="checklist">
+          <li><b>No user.</b> Who plays it, and for how long?</li>
+          <li><b>No check.</b> How will you know one thing works?</li>
+          <li><b>No limit.</b> How many rooms? What size? Only "due tomorrow".</li>
+          <li><b>No cut.</b> What does it leave out? Every prompt adds. None removes.</li>
+        </ul>
+        <div class="stamp">No user &middot; no check &middot; no limit &middot; no cut</div>
+        <span class="finding">final-project/EXHIBIT-0.md, worksheet Part A</span>
+      </div>
+    </div>
+    <aside class="notes"><b class="h">Speaker notes &middot; Exhibit 0 &middot; ~1.5 min &middot; running 2</b><p>Hand out Exhibit 0 now, or put it on the screen. Read the first prompt aloud.</p><p>Read the four "No" lines. Then ask the room: could a stranger build the right game from this? Could a stranger prove they built it right?</p><p>Do not mock it. Most of us start this way. That is the point.</p><p>Students fill in Part A after the deck, in step 2 of the lesson sheet.</p></aside>
+    <div class="slide-num"></div>
+  </section>
+
+  <!-- 3 · FIVE PROMPTS -->
+  <section class="slide" data-reg="sc" aria-label="Slide 3: Five prompts, one game, no plan">
+    <div class="voice-eyebrow"><span>The sand castle, 1 of 2</span><span class="reg">SAND CASTLE</span></div>
+    <h1 class="med">Five prompts. One game. No plan.</h1>
+    <div class="waves">
+      <div class="card wave"><div class="w">Prompt 1</div><q>"Make me a fantasy text adventure... warrior, mage or rogue... a dragon at the end."</q><span class="m">Adds: classes, rooms, monsters, a dragon</span></div>
+      <div class="card wave"><div class="w">Prompt 2</div><q>"Add a save system... an inventory and gold."</q><span class="m">Adds: saving, items, money</span></div>
+      <div class="card wave"><div class="w">Prompt 3</div><q>"Make it spookier... a Sanity meter."</q><span class="m">Adds: a crypt, fog, a meter</span></div>
+      <div class="card wave"><div class="w">Prompt 4</div><q>"Add more endings... make the choices really matter."</q><span class="m">Adds: endings, a secret ending</span></div>
+      <div class="card wave"><div class="w">Prompt 5</div><q>"It's due tomorrow. Clean it up and ship it."</q><span class="m">Adds: nothing. Promotes it.</span></div>
+    </div>
+    <span class="finding">final-project/EXHIBIT-0.md, prompts 1 to 5</span>
+    <div class="ooc-note"><b class="h">How to read this slide</b><p>Each answer is pasted over the last one. Each prompt only says what to <b>add</b>. Nothing ever decides what the game is for, so nothing decides what to keep. We did not build this game. A measured case study did the same thing with an AI agent: five prompts, one file. Slide 10 has its numbers.<span class="finding">cyoa-unit/SOURCES.md, the case-study rows</span></p></div>
+    <aside class="notes"><b class="h">Speaker notes &middot; Five prompts &middot; ~1 min &middot; running 3</b><p>Walk the five cards fast. Each one adds. None removes. The last one adds nothing at all: it turns whatever exists into the product.</p><p>Be honest that this chain is a made-up example for the class. The case study behind the numbers on slide 10 did the same thing for real, with a different game. Its name and files are in SOURCES.md for anyone who asks.</p></aside>
+    <div class="slide-num"></div>
+  </section>
+
+  <!-- 4 · DEFECTS -->
+  <section class="slide" data-reg="sc" aria-label="Slide 4: It plays. It also lies a little.">
+    <div class="voice-eyebrow"><span>The sand castle, 2 of 2</span><span class="reg">SAND CASTLE</span></div>
+    <h1 class="med">It plays. It also lies a little.</h1>
+    <div class="cols wide-l">
+      <div class="mockgrid">
+        <div><span class="mock-cap">1 &middot; A meter that decides nothing</span>
+<pre class="console" aria-label="Mock-up: a Sanity meter shown at every choice">Sanity: <span class="hl">3/5</span>   Gold: 40
+Where do you go? [plan]
+  1. Into the crypt
+  2. Back to the stairs
+<span class="cmt"># No scene and no ending ever reads Sanity.</span></pre></div>
+        <div><span class="mock-cap">2 &middot; An ending you can jump to</span>
+<pre class="console" aria-label="Mock-up: a hand-edited save file opens the winning ending">$ cat save.json
+{ "room": "<span class="bad">dragon_slain</span>", "gold": 40 }
+> l
+Loaded.
+<span class="hd">*** YOU SLEW THE DRAGON ***</span></pre></div>
+        <div><span class="mock-cap">3 &middot; A half decision</span>
+<pre class="console" aria-label="Mock-up: one option of a choice changes nothing">An amulet glows on the altar. [final]
+  1. Take the amulet   <span class="cmt"># opens the secret ending</span>
+  2. Leave it          <span class="cmt"># same as never seeing it</span></pre></div>
+        <span class="finding">Mock-ups drawn for this class, in console form. The case study measured all three in its web build: meters that decided nothing, an address that opened any ending, a choice that was real in one direction only.</span>
+      </div>
+      <div>
+        <ul class="checklist">
+          <li><b>None of these crash.</b> The game plays. A quick test finds nothing wrong.</li>
+          <li><b>Each one is a question nobody asked.</b> What is the meter for? Which endings should be hard to reach? What does "leave it" change?</li>
+          <li><b>A user story asks those questions.</b> "As a player, I want my Sanity to matter, so that..." Then: what is the check?</li>
+          <li><b>Not a bug list for blame.</b> Each prompt was answered. No prompt asked for these.</li>
+        </ul>
+      </div>
+    </div>
+    <aside class="notes"><b class="h">Speaker notes &middot; Defects &middot; ~1.5 min &middot; running 4.5</b><p>Start with fairness: it runs. There is no error. The defects are about meaning, not crashes.</p><p>One: the meter is on the screen at every choice, and nothing reads it. Two: the save file is plain text, so a player can type the winning room into it and load. Three: the amulet choice is real one way only; leaving it is the same as never seeing it.</p><p>Ask the room: which of these would a user story have caught? All three. A story asks what a thing is for, and how you would check it.</p><p>The panels are mock-ups in console form. The case study found the same three kinds of defect in its web page.</p></aside>
+    <div class="slide-num"></div>
+  </section>
+
+  <!-- 5 · FAIR -->
+  <section class="slide" data-reg="night" aria-label="Slide 5: What the sand castle did better">
+    <div class="voice-eyebrow">Be fair</div>
+    <div class="lane-label">Measured in the case study, not a judgement of the method</div>
+    <h1 class="med">What the sand castle did better</h1>
+    <div class="cols">
+      <ul class="checklist">
+        <li><b>It played sooner.</b> First playable build about 16 minutes earlier on the agent clock. The two builds ran side by side, so this is not a clean race.</li>
+        <li><b>It looked richer.</b> Art, animation and a character-builder screen. The blueprint build had no art at all.</li>
+        <li><b>It carried more of the wishes.</b> More of what the prompts asked for made it into the file.</li>
+      </ul>
+      <ul class="checklist">
+        <li><b>It was longer.</b> 1,626 words of player text, against 809.</li>
+        <li><b>It did not crash.</b> Every path ended somewhere. No errors.</li>
+        <li><b>It needed nothing installed.</b> One file. Double-click and play.</li>
+      </ul>
+    </div>
+    <span class="finding">Case study listed in cyoa-unit/SOURCES.md (its AUTOPSY.md section 7, "What the sand castle did better")</span>
+    <div class="ooc-note"><b class="h">What this does not say</b><p>Word counts and screens do not measure fun. Only a person playing it can tell you that. That is why your Definition of Done ends with a classmate's playtest.<span class="finding">final-project/ASSIGNMENT.md section 5 &middot; lessons/FINAL3-playtest-and-present.md</span></p></div>
+    <aside class="notes"><b class="h">Speaker notes &middot; What it did better &middot; ~1.5 min &middot; running 6</b><p>Say this slide with respect. Speed is real. A quick build is a good way to find out if an idea is fun.</p><p>The blueprint build chose to cut art and extras. That cut has a price, and anyone who opens both builds sees the price at once.</p><p>Do not turn this into a win for the blueprint. The next slide says why speed was not the problem.</p></aside>
+    <div class="slide-num"></div>
+  </section>
+
+  <!-- 6 · SPIKE -->
+  <section class="slide" data-reg="night" aria-label="Slide 6: A spike answers a question, then dies">
+    <div class="voice-eyebrow">The point of the exhibit</div>
+    <h1 class="med">A spike answers a question, then dies</h1>
+    <div class="lane-title g">A spike, used well</div>
+    <div class="lane good">
+      <div class="step"><small>1</small>Write the question down. "Is my lever fun?"</div><span class="arr">&rarr;</span>
+      <div class="step"><small>2</small>Build the quick thing. Three scenes.</div><span class="arr">&rarr;</span>
+      <div class="step"><small>3</small>Read the answer. Play it.</div><span class="arr">&rarr;</span>
+      <div class="step"><small>4</small>Throw it away, or design from what it taught you.</div>
+    </div>
+    <div class="lane-title b">What happened to the sand castle</div>
+    <div class="lane bad">
+      <div class="step"><small>1</small>Prompt.</div><span class="arr">&rarr;</span>
+      <div class="step"><small>2</small>Take the file.</div><span class="arr">&rarr;</span>
+      <div class="step"><small>3</small>Prompt on top. Three more times.</div><span class="arr">&rarr;</span>
+      <div class="step"><small>4</small>"Ship it." The spike is the product.</div>
+    </div>
+    <div class="quote">A spike that answers a question and is then thrown away is good practice. The failure is a spike that is promoted without a design pass.</div>
+    <div class="stamp" style="margin:14px 0 0">The failure is the promotion</div>
+    <span class="finding">final-project/ASSIGNMENT.md, "The idea" &middot; cyoa-unit/README.md</span>
+    <aside class="notes"><b class="h">Speaker notes &middot; Spike &middot; ~2 min &middot; running 8</b><p>Define it in one line: a spike answers a question, and then it is thrown away. Promoting it to the product is the failure.</p><p>Say plainly that a student may write a spike for this project. A tiny three-scene story to see if a lever is fun is a good spike. Then throw it away and write the blueprint.</p><p>Read the quoted line aloud. It is in the assignment word for word.</p><p>Stay calm. Nobody did anything wrong in the sand castle chain. The method has no place to ask the question.</p></aside>
+    <div class="slide-num"></div>
+  </section>
+
+  <!-- 7 · ONE STORY, TWO CHECKS, CUT LIST -->
+  <section class="slide" data-reg="bp" aria-label="Slide 7: One story, two checks, and the cut list">
+    <div class="voice-eyebrow"><span>The blueprint, 1 of 3</span><span class="reg">BLUEPRINT</span></div>
+    <h1 class="med">One story, two checks, and the cut list</h1>
+    <div class="cols">
+      <div>
+        <div class="card"><span class="tag">A lever user story</span>
+          <p>As a <b>player</b>, I want my choice of hero to change what I can do, so that a second play feels different.</p>
+          <p style="margin-top:8px"><b>Given</b> I chose Wizard, <b>when</b> I reach the stuck door, <b>then</b> I see "Force the door", and a Fighter sees "Put your shoulder to the door".</p></div>
+        <div class="card" style="margin-top:12px"><span class="tag">Check 1 &middot; the checker</span>
+          <p class="mono">OK lever: scene 'docks' sets role to fighter or wizard.</p></div>
+        <div class="card" style="margin-top:12px"><span class="tag">Check 2 &middot; two golden runs</span>
+          <p class="mono">tests/fort_wizard_oil_win.out &nbsp;&rarr;&nbsp; 2. Force the door<br>tests/fort_fighter_win.out &nbsp;&rarr;&nbsp; 1. Put your shoulder to the door</p></div>
+        <span class="finding">cyoa_kit/stories/fort_blueprint.md section 3 (US-1) &middot; python3 checker.py stories/fort.json &middot; cyoa_kit/tests/</span>
+      </div>
+      <div>
+        <div class="lane-label">Cut list: what the Fort example left out</div>
+        <table class="states">
+          <tr><td class="m">Torch clock</td><td>A meter that every move lowers doubles the states and every golden run.</td></tr>
+          <tr><td class="m">Dice at the door</td><td>No dice, so the lever shows clearly: the Fighter can, the Wizard cannot.</td></tr>
+          <tr><td class="m">Round-by-round fight</td><td>A loop inside a scene. This format has one choice per pick.</td></tr>
+          <tr><td class="m">Past the flooded stair</td><td>The example stays on the island and in the first cellars.</td></tr>
+        </table>
+        <span class="finding">cyoa_kit/stories/fort_blueprint.md section 8 (each row also says "revisit when")</span>
+      </div>
+    </div>
+    <p class="deck-body"><b>Cutting is a decision.</b> Each row has a reason, and says when you would look again.</p>
+    <aside class="notes"><b class="h">Speaker notes &middot; One story, two checks &middot; ~1.5 min &middot; running 9.5</b><p>Notice the page changed. The grid, the flat lines and the stillness are on purpose.</p><p>Read the user story aloud, then the Given/When/Then. A stranger could check this without asking you anything.</p><p>Two checks: the checker proves the lever exists. The golden runs prove what each hero sees at that door, word for word.</p><p>The cut list is the part the sand castle had no place for. Every final project needs at least three rows.</p></aside>
+    <div class="slide-num"></div>
+  </section>
+
+  <!-- 8 · THREE LAYERS -->
+  <section class="slide" data-reg="bp" aria-label="Slide 8: Three layers, one frozen engine">
+    <div class="voice-eyebrow"><span>The blueprint, 2 of 3</span><span class="reg">BLUEPRINT</span></div>
+    <h1 class="med">Three layers. One frozen engine.</h1>
+    <div class="cols wide-l">
+      <div>
+        <div class="layer"><h3>Display <span>display_plain.py &middot; display_ansi.py &middot; display_curses.py</span></h3>
+          <p><b>Owns</b>how text, choices and meters look. Reading what the player types.</p>
+          <p><b>May not</b>import engine. Change the state. Decide which choices show.</p></div>
+        <div class="layer eng"><h3>Engine <span>engine.py</span></h3>
+          <p><b>Owns</b>conditions, effects, dice, moving between scenes, save and load.</p>
+          <p><b>May not</b>call print or input. Hold game text. Know a scene id.</p></div>
+        <div class="layer data"><h3>Story <span>stories/story.json</span></h3>
+          <p><b>Owns</b>every scene, choice, ending, field, meter and flag. All game text.</p>
+          <p><b>May not</b>hold code. Hold comments: notes go in your blueprint.</p></div>
+        <span class="finding">final-project/STORY-FORMAT.md section 1 &middot; game.py is the glue: it calls the engine and the display</span>
+      </div>
+      <div>
+        <div class="api"><span class="hd">Frozen: nobody edits these</span>engine.py<br>checker.py<br>tests/run_tests.py<br><br><span class="hd">Yours in the build (with AI, Rung 4)</span><span class="own">game.py<br>display_*.py<br>a new .py file</span></div>
+        <span class="finding">final-project/ASSIGNMENT.md section 4 &middot; STORY-FORMAT.md section 11.4: the checker warns if engine.py changes</span>
+        <div class="bigline">The story lives in story.json, not in the Python.</div>
+      </div>
+    </div>
+    <aside class="notes"><b class="h">Speaker notes &middot; Three layers &middot; ~1.5 min &middot; running 11</b><p>Walk the layers top to bottom. The display shows. The engine decides. The story is data. Each layer has a list of what it may not do. Those lists are the design.</p><p>The engine is frozen for the whole project. The AI may help with game.py and the displays. It never touches the engine. The checker notices if it does.</p><p>Say the big line twice. Their whole game, every word of it, is one JSON file they write themselves.</p></aside>
+    <div class="slide-num"></div>
+  </section>
+
+  <!-- 9 · TEXT-ONLY PROTOTYPE -->
+  <section class="slide" data-reg="bp" aria-label="Slide 9: The text-only prototype">
+    <div class="voice-eyebrow"><span>The blueprint, 3 of 3</span><span class="reg">BLUEPRINT</span></div>
+    <h1 class="med">The text-only prototype</h1>
+    <div class="cols wide-l" style="margin-top:6px">
+      <div>
+<pre class="console" aria-label="Excerpt of a golden run of the Fort story" style="margin-top:0"><span class="cmt"># story: stories/fort.json seed: 1   answers: 1 1 1 2 1 1 1 1 q</span>
+<span class="hd">== The Fort Docks ==</span>
+<span class="dim">(The Fort, noon)</span>
+<span class="cmt">[...]</span>
+Who rows to the Isle of Old Stone? <span class="hl">[final]</span>
+  1. The Fighter
+     A sword and 8 hit points. Strong at doors.
+  2. The Wizard
+     A dagger, 4 hit points, and one Sleep spell.
+&gt; 1
+<span class="cmt">[...]</span>
+<span class="hd">== The Cellar Stair ==</span>
+<span class="cmt">[...]</span>
+Role: fighter
+
+The door is stuck. What do you do? <span class="hl">[final]</span>
+  1. Put your shoulder to the door
+&gt; 1
+
+The door bursts open with a crack like a dropped plank.
+<span class="cmt">[...]</span>
+  THE FLOODED STAIR
+<span class="cmt">[...]</span>
+THE END
+Trail: docks &gt; jetty &gt; tower &gt; cellar &gt; store &gt; flooded_stair</pre>
+        <span class="finding">cyoa_kit/tests/fort_fighter_win.in and .out &middot; lines copied; "[...]" marks lines left out</span>
+      </div>
+      <div>
+        <ul class="checklist" style="margin-top:0">
+          <li><b>[plan] and [final] mark the gate.</b> Looking is free. A final choice cannot be taken back.</li>
+          <li><b>Hidden options take no number.</b> The Fighter sees one way through the door. The Wizard sees others.</li>
+          <li><b>Same input, same output.</b> run_tests.py compares every line, so a change that breaks a path is caught.</li>
+          <li><b>Plain ASCII is the reference.</b> Colour and a full-screen layout are a stretch, and switch off when piped.<span class="finding">final-project/STRETCH-EFFECTS.md</span></li>
+        </ul>
+      </div>
+    </div>
+    <aside class="notes"><b class="h">Speaker notes &middot; The prototype &middot; ~1 min &middot; running 12</b><p>This is a real golden run from the kit, cut down. The answers come from the checker's "shortest way" line. The output is checked line by line every time the tests run.</p><p>Point at [final]. It is the plan and execute gate from the Fort game: talk and look for free, act for keeps.</p><p>It is plain. Say so. Colour is a stretch goal, and it switches itself off when the output is piped, so the tests still pass.</p></aside>
+    <div class="slide-num"></div>
+  </section>
+
+  <!-- 10 · THE NUMBERS -->
+  <section class="slide" data-reg="night" aria-label="Slide 10: Same idea, two builds, the numbers">
+    <div class="voice-eyebrow">The case study, side by side</div>
+    <h1 class="med">Same idea. Two builds. The numbers.</h1>
+    <div class="vs">
+      <div class="vs-head"><span>Measure</span><span class="a">Sand castle</span><span class="b">Blueprint</span></div>
+      <div class="vs-row"><span class="m">Tests</span><span class="a"><b>0</b></span><span class="b"><b>62</b> pass (re-run on 10/15/26: engine, story, path search and console tests)</span></div>
+      <div class="vs-row"><span class="m">Acceptance criteria</span><span class="a"><b>0</b></span><span class="b"><b>31</b>, each a Given/When/Then</span></div>
+      <div class="vs-row"><span class="m">Player text, all branches</span><span class="a"><b>1,626</b> words</span><span class="b"><b>809</b> words</span></div>
+    </div>
+    <span class="finding">Case study listed in cyoa-unit/SOURCES.md. Tests: its 4 non-web test files, run with python3 -m unittest on 10/15/26 (Ran 62 tests, OK; its web tests need Flask and were not run). Criteria and words: its AUTOPSY.md section 1.</span>
+    <div class="ooc-note"><b class="h">Read these with care</b><p>A count says a thing exists. It does not say the thing is good. Nobody measured whether either game is fun. The sand castle has twice the words. The blueprint can be changed and checked.</p></div>
+    <aside class="notes"><b class="h">Speaker notes &middot; The numbers &middot; ~1 min &middot; running 13</b><p>Three rows only. Tests: zero against sixty-two. Acceptance criteria: zero against thirty-one. Words: the sand castle has twice as many.</p><p>Say the sentence the case study ends on: the sand castle is faster to a first playable game and richer to look at. The blueprint can be changed and checked.</p><p>For you: the case study is Neon Wake. Its files and commit are in SOURCES.md. The 62 is today's re-run of its engine, story, search and console tests; the 113 in its own report includes web tests that need Flask.</p></aside>
+    <div class="slide-num"></div>
+  </section>
+
+  <!-- 11 · YOUR TURN -->
+  <section class="slide" data-reg="night" aria-label="Slide 11: Your turn, blueprint your story">
+    <div class="voice-eyebrow">Your turn</div>
+    <div class="lane-label">Blueprint due at the start of class, Tue 11/24/26</div>
+    <h1 class="med">Your turn: blueprint your story</h1>
+    <div class="cols">
+      <div>
+        <p class="deck-body" style="margin-top:0"><b>Before anything else, write three lines:</b></p>
+        <ol class="three">
+          <li><b>Who plays it</b>, and for how long.</li>
+          <li><b>How you will know one thing works.</b> A Given/When/Then.</li>
+          <li><b>One thing you will leave out</b>, and why.</li>
+        </ol>
+        <span class="finding">final-project/EXHIBIT-0.md Part C &middot; final-project/BLUEPRINT-TEMPLATE.md sections 1, 3, 8</span>
+      </div>
+      <div>
+        <div class="card"><span class="tag">Then, in this order</span>
+          <ul>
+            <li>1 &middot; User stories, with Given/When/Then</li>
+            <li>2 &middot; The Mermaid map</li>
+            <li>3 &middot; stories/story.json</li>
+            <li>4 &middot; <span class="mono">python3 checker.py stories/story.json</span></li>
+            <li>&nbsp;&nbsp;&nbsp;&nbsp;until it prints <span class="mono">RESULT: PASS</span></li>
+          </ul></div>
+        <div class="card" style="margin-top:12px"><span class="tag">AI</span>
+          <p><b>None on the blueprint or the story text.</b> Rung 4, AI as collaborator, starts after the gate.</p></div>
+        <span class="finding">final-project/ASSIGNMENT.md sections 1, 3 and 6 &middot; lessons/FINAL1-blueprint.md</span>
+      </div>
+    </div>
+    <div class="stamp">Save your prompts; the prompt is half the artifact</div>
+    <aside class="notes"><b class="h">Speaker notes &middot; Your turn &middot; ~2 min &middot; running 15</b><p>Restate the ask. A story with 6 to 15 scenes, at least 3 endings, a lever named role, a flag that opens a choice, and one real decision. The checker tests most of it.</p><p>The three lines are the smallest blueprint there is: a user, one check, one cut. Ask them to write those three lines first, before the map.</p><p>A sand castle is fine if you call it a spike. Know which one you are doing.</p><p>From the gate on, every prompt goes into prompts.md. The prompt is half the artifact. Then move to Exhibit 0, Part A.</p></aside>
+    <div class="slide-num"></div>
+  </section>
+
+</div>
+
+<div class="hud"><span class="keys-hint">&larr; &rarr; arrows / tap sides</span><button type="button" id="notesbtn" aria-pressed="false">N notes</button><button type="button" id="themebtn" aria-label="Switch light or dark">T theme</button></div>
+
+<script>
+(function(){
+  var slides=[].slice.call(document.querySelectorAll('.slide'));var i=0;
+  slides.forEach(function(s,k){var n=s.querySelector('.slide-num');if(n)n.textContent=(k+1)+' / '+slides.length;});
+  function register(){document.body.dataset.reg=slides[i].dataset.reg||'night';}
+  function show(n){
+    slides[i].classList.remove('active');
+    i=Math.max(0,Math.min(slides.length-1,n));
+    slides[i].classList.add('active');slides[i].scrollTop=0;register();
+    try{history.replaceState(null,'','#'+(i+1));}catch(e){}
+  }
+  function notes(){var on=document.body.classList.toggle('show-notes');document.getElementById('notesbtn').setAttribute('aria-pressed',on?'true':'false');}
+  function theme(){
+    var root=document.documentElement;
+    var dark=root.dataset.theme?root.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;
+    root.dataset.theme=dark?'light':'dark';
+    try{localStorage.setItem('cti110-deck-theme',root.dataset.theme);}catch(e){}
+  }
+  try{var saved=localStorage.getItem('cti110-deck-theme');if(saved==='light'||saved==='dark')document.documentElement.dataset.theme=saved;}catch(e){}
+  addEventListener('keydown',function(e){
+    if(e.altKey||e.ctrlKey||e.metaKey)return;
+    if(e.key===' '&&e.target.closest&&e.target.closest('a,button'))return; /* Space on a focused button presses it; it must not also turn the slide */
+    if(e.key==='n'||e.key==='N')notes();
+    else if(e.key==='t'||e.key==='T')theme();
+    else if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){e.preventDefault();show(i+1);}
+    else if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();show(i-1);}
+    else if(e.key==='Home')show(0);
+    else if(e.key==='End')show(slides.length-1);
+  });
+  addEventListener('click',function(e){
+    if(e.clientY<36||e.target.closest('a,button,aside.notes,.hud'))return;
+    show(e.clientX>innerWidth/2?i+1:i-1);
+  });
+  document.getElementById('notesbtn').addEventListener('click',notes);
+  document.getElementById('themebtn').addEventListener('click',theme);
+  var start=parseInt((location.hash||'').slice(1),10);
+  if(start>=1&&start<=slides.length)show(start-1);else register();
+})();
+</script>
+
+</body>
+</html>
