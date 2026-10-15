@@ -14,17 +14,24 @@
 #   python3 scan_fort_names.py
 #   python3 scan_fort_names.py --fort-repo ~/games-osr-fort-on-lake some/file.md
 #
-# Prints "HIT path:line: match" for each hit, or "no hits".
-# Exit code: 0 no hits, 1 at least one hit, 2 the patterns could not be read.
+# By default the class and Fort repositories are found next to this one
+# (all three cloned into the same folder). Use --course-repo and --fort-repo
+# when they live elsewhere.
+#
+# Prints "HIT path:line: match" for each hit, or "no hits" and how many
+# files it scanned.
+# Exit code: 0 no hits, 1 at least one hit, 2 the patterns could not be read
+# or no file was found to scan.
 
 import argparse
 import os
 import re
 import sys
 
-COURSE = "/home/user/course-cti110-26fa"
-STORMING = "/home/user/course-cti110-storming/cyoa-unit"
-DEFAULT_FORT = "/home/user/games-osr-fort-on-lake"
+STORMING = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # cyoa-unit/
+CLONES = os.path.dirname(os.path.dirname(STORMING))                       # the folder of clones
+DEFAULT_COURSE = os.path.join(CLONES, "course-cti110-26fa")
+DEFAULT_FORT = os.path.join(CLONES, "games-osr-fort-on-lake")
 
 # One JavaScript regex literal: /body/flags
 JS_REGEX = re.compile(r"/((?:\\.|[^/\\\n])+)/([a-z]*)")
@@ -90,13 +97,13 @@ def files_under(folder, endings):
     return found
 
 
-def default_paths():
+def default_paths(course):
     """The stories and blueprints, the class code, and the unit's pages."""
-    stories = os.path.join(COURSE, "cyoa_kit", "stories")
+    stories = os.path.join(course, "cyoa_kit", "stories")
     paths = [os.path.join(stories, name) for name in
              ("fort.json", "dead_drop.json", "fort_blueprint.md", "dead_drop_blueprint.md")]
     for folder in ("p5", "p6", "p7", "cyoa_kit"):
-        paths = paths + files_under(os.path.join(COURSE, folder), (".md", ".py", ".json"))
+        paths = paths + files_under(os.path.join(course, folder), (".md", ".py", ".json"))
     paths = paths + files_under(STORMING, (".md", ".html"))
     unique = []
     for path in paths:
@@ -111,8 +118,11 @@ def expand(paths):
     for path in paths:
         if os.path.isdir(path):
             result = result + files_under(path, (".md", ".py", ".json", ".html"))
-        else:
+        elif os.path.isfile(path):
             result.append(path)
+        else:
+            print(f"Not found: {path}")
+            sys.exit(2)
     return result
 
 
@@ -135,6 +145,8 @@ def main():
     parser = argparse.ArgumentParser(description="Scan files for the Fort repository's forbidden names.")
     parser.add_argument("--fort-repo", default=DEFAULT_FORT,
                         help="the Fort on the Lake repository (default: %(default)s)")
+    parser.add_argument("--course-repo", default=DEFAULT_COURSE,
+                        help="the CTI 110 class repository (default: %(default)s)")
     parser.add_argument("paths", nargs="*", help="files or folders to scan (default: the unit's files)")
     options = parser.parse_args()
 
@@ -148,7 +160,13 @@ def main():
               "Check generator/test.mjs and intro/test.mjs.")
         sys.exit(2)
 
-    paths = expand(options.paths) if options.paths else default_paths()
+    if not options.paths and not os.path.isdir(options.course_repo):
+        print(f"Cannot find the class repository at {options.course_repo}. Use --course-repo.")
+        sys.exit(2)
+    paths = expand(options.paths) if options.paths else default_paths(options.course_repo)
+    if not paths:
+        print("Found no files to scan. Check --course-repo and the paths you gave.")
+        sys.exit(2)
     hits = []
     for path in paths:
         hits = hits + scan_file(path, patterns)
@@ -156,7 +174,7 @@ def main():
     for hit in hits:
         print("HIT " + hit)
     if not hits:
-        print("no hits")
+        print(f"no hits in {len(paths)} files")
         sys.exit(0)
     sys.exit(1)
 
